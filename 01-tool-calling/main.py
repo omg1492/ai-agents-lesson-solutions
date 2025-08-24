@@ -1,6 +1,7 @@
 import os
 import json
-import yfinance as yf
+import requests
+from urllib.parse import quote
 from openai import OpenAI
 from pprint import pprint
 from dotenv import load_dotenv
@@ -14,58 +15,95 @@ client = OpenAI(
 )
 
 # Function Implementations
-def get_stock_price(ticker: str):
-    ticker_info = yf.Ticker(ticker).info
-    current_price = ticker_info.get("currentPrice")
-    return {"ticker": ticker, "current_price": current_price}
+def get_current_weather(location: str):
+    """
+    Fetch current weather using wttr.in (public, no API key).
+    Docs: https://wttr.in/:help
+    """
+    try:
+        url = f"https://wttr.in/{quote(location)}?format=j1"
+        resp = requests.get(
+            url,
+            timeout=10
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
+        cur = (data.get("current_condition") or [{}])[0]
+        nearest = (data.get("nearest_area") or [{}])[0]
 
-def get_dividend_date(ticker: str):
-    ticker_info = yf.Ticker(ticker).info
-    dividend_date = ticker_info.get("dividendDate")
-    return {"ticker": ticker, "dividend_date": dividend_date}
+        resolved_location = None
+        try:
+            name = (nearest.get("areaName") or [{}])[0].get("value")
+            region = (nearest.get("region") or [{}])[0].get("value")
+            country = (nearest.get("country") or [{}])[0].get("value")
+            parts = [p for p in [name, region, country] if p]
+            resolved_location = ", ".join(parts) if parts else None
+        except Exception:
+            pass
+
+        result = {
+            "query": location,
+            "resolved_location": resolved_location,
+            "temperature_c": _to_float(cur.get("temp_C")),
+            "feels_like_c": _to_float(cur.get("FeelsLikeC")),
+            "condition": _first_text(cur.get("weatherDesc")),
+            "humidity_pct": _to_int(cur.get("humidity")),
+            "wind_kph": _to_float(cur.get("windspeedKmph")),
+            "observation_time_utc": cur.get("observation_time"),
+            "source": "wttr.in",
+        }
+        return result
+    except requests.HTTPError as e:
+        return {"query": location, "error": "http_error", "status": e.response.status_code, "detail": str(e)}
+    except requests.RequestException as e:
+        return {"query": location, "error": "network_error", "detail": str(e)}
+    except Exception as e:
+        return {"query": location, "error": "parse_error", "detail": str(e)}
+
+def _first_text(arr):
+    if isinstance(arr, list) and arr:
+        v = arr[0]
+        if isinstance(v, dict):
+            return v.get("value")
+        return v
+    return None
+
+def _to_float(v):
+    try:
+        return float(v) if v is not None else None
+    except Exception:
+        return None
+
+def _to_int(v):
+    try:
+        return int(v) if v is not None else None
+    except Exception:
+        return None
 
 # Define custom tools
 tools = [
-     {
-        "type": "function",
-        "function": {
-            "name": "get_stock_price",
-            "description": "Use this function to get the current price of a stock.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "The ticker symbol for the stock, e.g. GOOG",
-                    }
-                },
-                "required": ["ticker"],
-            },
-        }
-    },
     {
         "type": "function",
         "function": {
-            "name": "get_dividend_date",
-            "description": "Use this function to get the next dividend payment date of a stock.",
+            "name": "get_current_weather",
+            "description": "Get the current weather for a given location (city name or 'lat,lon').",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "ticker": {
+                    "location": {
                         "type": "string",
-                        "description": "The ticker symbol for the stock, e.g. GOOG",
+                        "description": "City or place name (e.g., 'Prague' or '49.283,14.153')."
                     }
                 },
-                "required": ["ticker"],
+                "required": ["location"],
             },
         }
     },
 ]
 
 available_functions = {
-    "get_stock_price": get_stock_price,
-    "get_dividend_date": get_dividend_date,
+    "get_current_weather": get_current_weather,
 }
 
 # Function to process messages and handle function calls
@@ -133,7 +171,8 @@ def get_completion_from_messages(messages, model="gpt-4o"):
 # Example usage
 messages = [
     {"role": "system", "content": "You are a helpful AI assistant."},
-    {"role": "user", "content": "What is the current stock price for MSFT?"},
+    # Try any location: "Prague", "Brno, CZ", "49.74,13.59"
+    {"role": "user", "content": "What is the current weather in Prague?"},
 ]
 
 response = get_completion_from_messages(messages)
