@@ -1,0 +1,287 @@
+{
+  "name": "My workflow 5",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Prompts\n\n### What is the weather in Prague?\n\n_The current weather in Prague is as follows:\\n\\n- **Temperature:** 24°C (75°F)\\n- **Condition:** Sunny\\n- **Feels Like:** 25°C (78°F)\\n- **Humidity:** 50%\\n- **Wind Speed:** 11 km/h (7 mph) from the WSW\\n- **Visibility:** 10 km\\n- **Pressure:** 1022 hPa\\n\\n### Today's Forecast:\\n- **Max Temperature:** 25°C (76°F)\\n- **Min Temperature:** 12°C (54°F)\\n- **Average Humidity:** 72%\\n- **Sunshine Hours:** Approximately 11.8 hours\\n\\nIt seems to be a pleasant day with clear and sunny skies!_\n\n### What chat inputs are in the log?\n\n_The chat input log contains the following entry:\\n\\n1. **User Input:** \"What is the weather in Prague.\"\\n   - **Agent Response:** The current weather in Prague is as follows:\\n     - **Temperature:** 24°C (75°F)\\n     - **Condition:** Sunny\\n     - **Feels Like:** 25°C (78°F)\\n     - **Humidity:** 50%\\n     - **Wind S..._\n\n### Select all records stored in the log table and count them.\n_There are a total of **2 records** stored in the log table. Here are the details of each entry:\\n\\n1. **Log Entry 1:**\\n   - **ID:** 27\\n   - **Chat Input:** \"What is the weather in Prague..._",
+        "height": 437,
+        "width": 902
+      },
+      "id": "45787544-c241-4063-8dab-d8be1399548d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e5291f98-2322-442c-9fbb-b9c13ee1a53a",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        608,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "uIZpGPAaIINd804p",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# User message\n\n{{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a helpful AI assistant capable to provide information about weather and about interaction with user. Both chat input and your response is stored in the log table."
+        }
+      },
+      "id": "3ad6f8ac-2567-4da8-85db-87c164d3398a",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        672,
+        16
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        240
+      ],
+      "id": "a6ab0830-01d1-49fa-a80a-fcdd9baba317",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Get the current weather for a given location (city name or 'lat,lon').",
+        "url": "=https://wttr.in/{{ $fromAI('Location', ``, 'string') }}?format=j1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        320
+      ],
+      "id": "8c4663f9-6b2d-4f90-a9aa-262708c0339b",
+      "name": "get_current_weather"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "name"
+        },
+        "table": {
+          "__rl": true,
+          "value": "log",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        1040,
+        256
+      ],
+      "id": "75758b05-8541-4899-916f-c03fad2fa205",
+      "name": "run_sql_select",
+      "credentials": {
+        "postgres": {
+          "id": "TIEbv5dQFwjRkPm6",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "log",
+          "mode": "list",
+          "cachedResultName": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "agent_response": "={{ $json.output }}",
+            "chat_input": "={{ $(\"input\").first().json.chatInput }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chat_input",
+              "displayName": "chat_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agent_response",
+              "displayName": "agent_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "when_created",
+              "displayName": "when_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1072,
+        16
+      ],
+      "id": "af14d90e-7d7f-4003-9c21-c494b23d2df9",
+      "name": "Log",
+      "credentials": {
+        "postgres": {
+          "id": "TIEbv5dQFwjRkPm6",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "bd7b5c5c-e99c-4ca1-a796-fd1ca777527b",
+      "name": "input",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        16
+      ],
+      "webhookId": "a889d2ae-2159-402f-b326-5f61e90f602e"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_current_weather": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_sql_select": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "input": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3ab936da-d2fc-4263-833b-4fdac812f2e4",
+  "meta": {
+    "instanceId": "6b7629ebb86ede99627ba79c44094b9d8412c4a4f0b366479e0a21191b89a72f"
+  },
+  "id": "dPS98vmfjgRQOimh",
+  "tags": []
+}
